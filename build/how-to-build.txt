@@ -1,0 +1,8 @@
+Windows (From Windows PowerShell): g++ -std=c++17 -O2 -s -Wall -Wextra -o javasharp main.cpp
+Linux (From Linux or WSL): g++ -std=c++17 -O2 -s -Wall -Wextra -o javasharp main.cpp
+macOS x64 (From Windows Powershell, Linux or WSL): python -m ziglang c++ -target x86_64-macos.10.15 -std=c++17 -O2 -s -o javasharp-macos-x64 main.cpp
+macOS arm64 (From Windows Powershell, Linux or WSL): python -m ziglang c++ -target aarch64-macos.11.0 -std=c++17 -O2 -s -o javasharp-macos-arm64 main.cpp
+Android arm64 (From Linux or WSL): $HOME/android-sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++ -std=c++17 -O2 -DNDEBUG -ffunction-sections -fdata-sections -static-libstdc++ -Wl,--gc-sections -s main.cpp -o javasharp-android-arm64
+
+Notice for "Android arm64": If your NDK version is not 26.1.10909125, replace it with the version you are using.
+Notice for "macOS arm64 & macOS x64": Install ziglang first: pip install ziglang

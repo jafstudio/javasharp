@@ -1,0 +1,5 @@
+Windows build: MinGW-w64 GCC 15.2.0 (MSYS2)
+Linux build: GCC 13.3.0 from Ubuntu 24.04
+macOS x64 build: ziglang 0.17.1
+macOS arm64 build: ziglang 0.17.1
+Android arm64 build: NDK 26.1.10909125
