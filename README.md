@@ -1,147 +1,257 @@
 # JavaSharp
 
-**JavaSharp** — a console source-to-source transpiler: it translates programs from Java to C#. Written in C++17, it builds into a single executable with no external dependencies. The current version is **1.0.0**.
+**JavaSharp** is a command-line source-to-source converter that translates Java source files (`.java`) into C# source files (`.cs`). It is implemented in C++17 and includes prebuilt command-line binaries for several 64-bit platforms.
 
-## How it works
-
-The converter goes through four stages implemented in pluggable headers:
-
-1. **Lexer** — tokenizes the `.java` file and collects comments;
-2. **Parser** (`js_parser.hpp`) — builds the syntax tree of a compilation unit (classes, interfaces, enums, records, methods, expressions);
-3. **Semantic analysis** (`js_semantic.hpp`) — infers types, resolves method overrides, finds functional interfaces (SAM) for lambdas, and collects information about records and anonymous classes;
-4. **C# generation** (`js_emit.hpp`) — prints the finished `.cs` file with correct indentation, `using` directives, and type casts.
+- **Version:** 1.0.0
+- **Language:** C++17
+- **License:** Apache License 2.0
 
 ## Features
 
-- **Java standard library to .NET mapping**: collections (`ArrayList`/`Vector` → `List<T>`, `HashMap` → `Dictionary<K,V>`, `HashSet` → `HashSet<T>`, `TreeMap` → `SortedDictionary<K,V>`, `Queue`/`Deque` → `LinkedList<T>`, `Iterator`/`Iterable`/`Stream` → `IEnumerable`/`IEnumerator`), I/O (`java.io`, `java.nio.file` → `System.IO`), date and time (`java.time`), networking (`java.net`), math (`java.math` → `System.Numerics`).
-- **Type and exception mapping**: `boolean` → `bool`, wrapper types (`Integer` → `int?`, etc.), `String` → `string`, `Object` → `object`; `IndexOutOfBoundsException` → `IndexOutOfRangeException`, `NumberFormatException` → `FormatException`, `NullPointerException` → `NullReferenceException`, and dozens more.
-- **Member and method renaming**: `System.out.println` → `Console.WriteLine`, `size()` → `Count`, `super` → `base`, the `main` method → `Main`, record components are converted to `PascalCase`.
-- **Lambdas and anonymous classes**: functional interfaces (`Supplier`, `Function`, `Consumer`, etc.) become `Func`/`Action` delegates; anonymous classes are extracted into generated nested classes (`__Anon0`, `__Anon1`, …).
-- **Language constructs**: enums, interfaces, switch, foreach, records, the `instanceof` operator, `var`, and insertion of explicit numeric type casts by rank.
-- **Batch conversion**: a single run can convert several files by repeating the `--convert` pairs.
-- **Error resilience**: if the input file contains syntax errors, conversion continues, and the exit code reports a partial result.
+JavaSharp parses a Java compilation unit, performs lightweight type and declaration analysis, and emits corresponding C# source code.
 
-## Usage
+The parser recognizes a range of Java language constructs, including:
 
+- Classes, interfaces, enums, annotation declarations, and records.
+- Fields, methods, constructors, nested types, and local classes.
+- Inheritance, implemented interfaces, generic type parameters, and arrays.
+- Control-flow statements such as `if`, `for`, enhanced `for`, `while`, `do-while`, and `switch`.
+- `try`/`catch`/`finally`, try-with-resources, `throw`, `synchronized`, and `assert`.
+- Lambdas, method references, anonymous classes, conditional expressions, and `instanceof` patterns.
+- Switch expressions and arrow-style switch labels.
+- Java comments and selected annotations.
+
+It also includes mappings for common Java types and APIs to .NET equivalents. Examples include:
+
+| Java | Generated C# equivalent |
+| --- | --- |
+| `String` | `string` |
+| `Object` | `object` |
+| `boolean` | `bool` |
+| `System.out` | `Console.Out` |
+| `ArrayList` / `List` | `List` |
+| `HashMap` / `Map` | `Dictionary` |
+| `HashSet` / `Set` | `HashSet` |
+| `BigDecimal` | `decimal` |
+| `BigInteger` | `BigInteger` |
+| `LocalDate` | `DateOnly` |
+| `LocalTime` | `TimeOnly` |
+| `LocalDateTime` | `DateTime` |
+
+Some Java library types are translated to .NET types, and the converter can emit small helper implementations for selected Java APIs when needed.
+
+> **Compatibility note:** JavaSharp is a source converter, not a complete Java compiler or a full implementation of the Java standard library. It writes C# source files; it does not create a `.csproj`, resolve project dependencies, compile, or run the generated code. Java and .NET APIs do not always have identical behavior. Review generated code, resolve any project-specific dependencies, and compile and test the result in your target .NET environment.
+
+## Quick start
+
+### Use a prebuilt binary
+
+Prebuilt executables are provided in the `build/` directory:
+
+| Platform | Executable |
+| --- | --- |
+| Windows x64 | `build/javasharp-windows-x64.exe` |
+| Linux x64 | `build/javasharp-linux-x64` |
+| macOS x64 | `build/javasharp-macos-x64` |
+| macOS ARM64 | `build/javasharp-macos-arm64` |
+| Android ARM64 | `build/javasharp-android-arm64` |
+
+For example, on Linux:
+
+```bash
+chmod +x build/javasharp-linux-x64
+./build/javasharp-linux-x64 --version
 ```
+
+On Windows, run the executable from PowerShell:
+
+```powershell
+.\build\javasharp-windows-x64.exe --version
+```
+
+### Convert a Java file
+
+```bash
+./build/javasharp-linux-x64 --convert HelloWorld.java to HelloWorld.cs
+```
+
+The output path's parent directories are created when necessary. If the output file already exists, it is overwritten.
+
+## Command-line usage
+
+```text
 javasharp --convert <input.java> to <output.cs> [--convert <input.java> to <output.cs> ...]
 ```
 
+### Options
+
 | Option | Description |
 | --- | --- |
-| `--convert <in.java> to <out.cs>` | Convert a Java file to C# (the pair may be repeated) |
-| `--version`, `-v` | Show version |
-| `--help`, `-h` | Show help |
+| `--convert <in.java> to <out.cs>` | Convert one Java source file into one C# source file. This option can be repeated. |
+| `--version`, `-v` | Print the JavaSharp version. |
+| `--help`, `-h` | Print command-line help. |
 
-Exit codes: `0` — conversion completed without errors; `1` — the input file contained syntax errors (the result is partial); `2` — usage error or file read/write error.
+### Convert multiple files
+
+Pass an additional `--convert` pair for each file:
+
+```bash
+javasharp \
+  --convert src/Main.java to out/Main.cs \
+  --convert src/Utils.java to out/Utils.cs
+```
+
+Each conversion is processed as an individual source unit. JavaSharp does not build a project-wide compilation model across multiple input files.
 
 ## Example
 
-Input file `Main.java`:
+Given the following `HelloWorld.java`:
 
 ```java
-import java.util.ArrayList;
-import java.util.List;
+package demo;
 
-public class Main {
+public class HelloWorld {
     public static void main(String[] args) {
-        List<String> names = new ArrayList<>();
-        names.add("Alice");
-        names.add("Bob");
-        for (String n : names) {
-            System.out.println("Hello, " + n + "!");
-        }
-        System.out.println("Count: " + names.size());
+        System.out.println("Hello, World!");
     }
 }
 ```
 
 Run:
 
-```
-javasharp --convert Main.java to Main.cs
+```bash
+javasharp --convert HelloWorld.java to HelloWorld.cs
 ```
 
-Result `Main.cs`:
+JavaSharp produces:
 
 ```csharp
 using System;
 using System.Collections.Generic;
 
-public class Main
+namespace demo
 {
-    public static void Main(string[] args)
+    public class HelloWorld
     {
-        List<string> names = new List<string>();
-        names.Add("Alice");
-        names.Add("Bob");
-        foreach (string n in names)
+        public static void Main(string[] args)
         {
-            Console.WriteLine("Hello, " + n + "!");
+            Console.WriteLine("Hello, World!");
         }
-        Console.WriteLine("Count: " + names.Count);
     }
 }
 ```
 
-## Prebuilt binaries
+The converter maps the Java package to a C# namespace, changes the Java entry-point method name from `main` to `Main`, maps `String` to `string`, and translates `System.out.println` to `Console.WriteLine`.
 
-The `build/` directory contains prebuilt binaries:
+## Build from source
 
-| File | Platform |
-| --- | --- |
-| `javasharp-windows-x64.exe` | Windows x64 |
-| `javasharp-linux-x64` | Linux x64 |
-| `javasharp-macos-x64` | macOS x64 (10.15+) |
-| `javasharp-macos-arm64` | macOS ARM64 (11.0+) |
-| `javasharp-android-arm64` | Android ARM64 |
+### Requirements
 
-On Linux/macOS, remember to make the file executable: `chmod +x javasharp-linux-x64`.
+- A C++17-compatible compiler.
+- The C++ standard library and filesystem support provided by that compiler.
+- For the macOS cross-build commands below: Python and the `ziglang` package.
+- For the Android ARM64 build: Android NDK.
 
-## Building from source
+### Windows and Linux
 
-The sources are located in `src/`. A single file, `main.cpp`, which includes the entire chain of headers, is compiled:
+From the `src/` directory, build with GCC or MinGW-w64:
 
 ```bash
-# Windows (from PowerShell, MinGW-w64) or Linux:
 g++ -std=c++17 -O2 -s -Wall -Wextra -o javasharp main.cpp
 ```
 
-Cross-compilation (see `build/how-to-build.txt`):
+On Windows, run the resulting executable as `javasharp.exe` (or the filename produced by your compiler).
+
+### macOS cross-compilation
+
+Install Zig:
 
 ```bash
-# macOS x64 / macOS ARM64 — via ziglang (pip install ziglang):
-python -m ziglang c++ -target x86_64-macos.10.15  -std=c++17 -O2 -s -o javasharp-macos-x64 main.cpp
-python -m ziglang c++ -target aarch64-macos.11.0 -std=c++17 -O2 -s -o javasharp-macos-arm64 main.cpp
-
-# Android ARM64 — via NDK (adjust the path to your NDK version):
-$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++ \
-    -std=c++17 -O2 -DNDEBUG -ffunction-sections -fdata-sections \
-    -static-libstdc++ -Wl,--gc-sections -s main.cpp -o javasharp-android-arm64
+python -m pip install ziglang
 ```
 
-The toolchain used to build the binaries in `build/` is listed in `build/versions.txt` (MinGW-w64 GCC 15.2.0, GCC 13.3.0, ziglang 0.17.1, NDK 26.1.10909125).
+From the `src/` directory, build for macOS x64:
+
+```bash
+python -m ziglang c++ -target x86_64-macos.10.15 -std=c++17 -O2 -s -o javasharp-macos-x64 main.cpp
+```
+
+Build for macOS ARM64:
+
+```bash
+python -m ziglang c++ -target aarch64-macos.11.0 -std=c++17 -O2 -s -o javasharp-macos-arm64 main.cpp
+```
+
+### Android ARM64 cross-compilation
+
+The supplied build command uses Android NDK `26.1.10909125`. From the `src/` directory, run it in Linux or WSL:
+
+```bash
+$HOME/android-sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++ \
+  -std=c++17 -O2 -DNDEBUG -ffunction-sections -fdata-sections \
+  -static-libstdc++ -Wl,--gc-sections -s \
+  main.cpp -o javasharp-android-arm64
+```
+
+If your NDK is installed at a different version or location, update the compiler path accordingly.
+
+### Build metadata
+
+The included `build/versions.txt` records the toolchains used for the supplied binaries:
+
+- Windows: MinGW-w64 GCC 15.2.0 (MSYS2).
+- Linux: GCC 13.3.0 from Ubuntu 24.04.
+- macOS x64 and ARM64: Zig 0.17.1.
+- Android ARM64: Android NDK 26.1.10909125.
 
 ## Project structure
 
-```
-.
-├── LICENSE                  # Apache License 2.0
-├── updates.txt              # changelog
+```text
+javasharp/
+├── README.md
+├── LICENSE
+├── updates.txt
 ├── build/
-│   ├── how-to-build.txt     # build commands for all platforms
-│   ├── versions.txt         # build tool versions
-│   └── javasharp-*          # prebuilt binaries (5 platforms)
+│   ├── how-to-build.txt
+│   ├── versions.txt
+│   ├── javasharp-windows-x64.exe
+│   ├── javasharp-linux-x64
+│   ├── javasharp-macos-x64
+│   ├── javasharp-macos-arm64
+│   └── javasharp-android-arm64
 └── src/
-    ├── main.cpp             # CLI, conversion driver, expression generation
-    ├── js_base.hpp          # basic utilities, type mapping tables
-    ├── js_parser.hpp        # Java lexer and parser
-    ├── js_semantic.hpp      # semantic analysis
-    ├── js_emit.hpp          # C# code generation
+    ├── main.cpp
+    ├── js_base.hpp
+    ├── js_parser.hpp
+    ├── js_semantic.hpp
+    ├── js_emit.hpp
     └── onefile/
-        └── js.cpp           # everything in one file (standalone build)
+        └── js.cpp
 ```
+
+### Source files
+
+- `src/main.cpp` — command-line entry point, file handling, and conversion orchestration.
+- `src/js_base.hpp` — shared data structures, lexer, language/type mappings, and common utilities.
+- `src/js_parser.hpp` — Java parser and syntax-tree construction.
+- `src/js_semantic.hpp` — declaration collection, type classification, and semantic transformations.
+- `src/js_emit.hpp` — C# code generation.
+- `src/onefile/js.cpp` — amalgamated single-translation-unit version of the implementation.
+
+## Diagnostics and exit codes
+
+JavaSharp prints conversion progress to standard output and reports parsing or file errors to standard error.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Conversion succeeded without reported syntax errors. |
+| `1` | C# output was written, but syntax errors were reported for the Java input. Review the diagnostics and generated file. |
+| `2` | Invalid command-line usage, or an input/output file error. |
+
+Syntax diagnostics include the source line number. A conversion that returns `1` may still produce an output file, so the generated code should be reviewed before use.
 
 ## License
 
-The project is distributed under the [Apache License 2.0](LICENSE).
+JavaSharp is distributed under the [Apache License, Version 2.0](LICENSE).
+
+Copyright 2026 JafStudio.
